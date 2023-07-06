@@ -55,10 +55,13 @@ namespace Bakalari {
 		Abbrev = school url
 		*/
 		class School : public ABasicStruct {
-		/*public:
+		public:
 			School();
 			School(string _id, string _name, string _url);
 			~School();
+
+			void SetUrl(string _url);
+			string* GetUrl();
 
 		private:
 			string *m_url;
@@ -66,13 +69,14 @@ namespace Bakalari {
 			//hide abbrev methods
 			using ABasicStruct::GetAbbrev;
 			using ABasicStruct::SetAbbrev;
-			using ABasicStruct::ABasicStruct;*/
+			using ABasicStruct::ABasicStruct;
 		};
 
 		/*
 		City class
 		*/
 		class City {
+		public:
 			City();
 			City(string _name);
 			City(string _name, vector<School*> _schools);
@@ -103,9 +107,10 @@ namespace Bakalari {
 		+ info about bakalari API
 		*/
 		class Access {
+		public:
 			Access();
-			Access(string _name, string _pwd);
-			Access(string _refreshToken);
+			Access(School _school, string _name, string _pwd);
+			Access(School _school, string _refreshToken);
 			~Access();
 
 			/*
@@ -115,6 +120,9 @@ namespace Bakalari {
 			return TRUE if ok 
 			*/
 			bool Login(string _name, string _pwd);
+			bool Login(School _school, string _name, string _pwd);
+			bool Login(School *_school, string _name, string _pwd);
+			
 
 			/*
 			* Login by refresh token
@@ -123,6 +131,8 @@ namespace Bakalari {
 			return TRUE if oks
 			*/
 			bool RefreshLogin();
+			bool RefreshLogin(School _school);
+			bool RefreshLogin(School *_school);
 
 			/*
 			GET https://sluzby.bakalari.cz/api/v1/municipality
@@ -160,7 +170,7 @@ namespace Bakalari {
 
 		private:
 			string* m_name;
-			vector<string*>* rights;
+			vector<string*>* m_rights;
 		};
 
 	}
@@ -178,7 +188,7 @@ namespace Bakalari {
 		class User {
 		public:
 			User();
-			User(string _uid, string _fullName, string _userName, string _type, int _studyYear, vector<ModuleAccess::Permission*> _enabledPerm);
+			User(string _uid, string _fullName, string _userName, string _type, string _typetext, int _studyYear, vector<ModuleAccess::Permission*> _enabledPerm);
 			User(ModuleAccess::Access* _access);
 			~User();
 
@@ -198,7 +208,7 @@ namespace Bakalari {
 
 			string* GetUid();
 			string* GetFullName();
-			string* GetUserName();
+			string* GetUsername();
 			string* GetType();
 			string* GetTypeText();
 			int* GetStudyYear();
@@ -217,14 +227,18 @@ namespace Bakalari {
 		Class class
 		*/
 		class Class : public ABasicStruct {
-			
+		public:
+			Class();
+			Class(string _id, string _name, string _abbrev);
 		};
 
 		/*
 		Teacher class
 		*/
 		class Teacher : public ABasicStruct {
-
+		public:
+			Teacher();
+			Teacher(string _id, string _name, string _abbrev);
 		};
 
 		/*
@@ -247,14 +261,18 @@ namespace Bakalari {
 		Room class
 		*/
 		class Room : public ABasicStruct {
-
+		public:
+			Room();
+			Room(string _id, string _name, string _abbrev);
 		};
 
 		/*
 		Cycle class
 		*/
 		class Cycle : public ABasicStruct {
-
+		public:
+			Cycle();
+			Cycle(string _id, string _name, string _abbrev);
 		};
 	}
 
@@ -269,26 +287,29 @@ namespace Bakalari {
 		class Hour {
 		public:
 			Hour();
-			Hour(int _id, string _caption, time_t _begintime, time_t _endtime);
+			Hour(int _id, string _caption, tm _begintime, tm _endtime);
+			Hour(int _id, string _caption, tm* _begintime, tm* _endtime);
 			~Hour();
 
 			void SetId(int _id);
 			void SetCaption(string _caption);
-			void SetBeginTime(time_t _begintime);
-			void SetEndTime(time_t _endtime);
+			void SetBeginTime(tm _begintime);
+			void SetEndTime(tm _endtime);
 
 			int* GetId();
 			string* GetCaption();
-			time_t* GetBeginTime();
-			time_t* GetEndTime();
+			tm* GetBeginTime();
+			tm* GetEndTime();
 		private:
-			int* Id;
-			string* Caption;
-			time_t* BeginTime, *EndTime;
+			int* m_id;
+			string* m_caption;
+			tm* m_beginTime, *m_endTime;
 		};
 
 		class Subject : public ABasicStruct {
-
+		public:
+			Subject();
+			Subject(string _id, string _name, string _abbrev);
 		};
 
 		/*
@@ -305,7 +326,7 @@ namespace Bakalari {
 			void SetTheme(string _theme);
 			void SetChange(bool _change);
 			void SetGroups(vector<ModulePeople::Group> _groups);
-			void SetCycles(vector<ModulePeople::Cycle> _groups);
+			void SetCycles(vector<ModulePeople::Cycle> _cycles);
 			void SetTeacher(ModulePeople::Teacher _teacher);
 			void SetRoom(ModulePeople::Room _room);
 			//void SetHomework(ModuleMarks::Homework _homework);
@@ -315,7 +336,7 @@ namespace Bakalari {
 			string* Getheme();
 			bool* Gethange();
 			vector<ModulePeople::Group*>* GetGroups();
-			vector<ModulePeople::Cycle>* GetCycles();
+			vector<ModulePeople::Cycle*>* GetCycles();
 			ModulePeople::Teacher* GetTeacher();
 			ModulePeople::Room* GetRoom();
 			//ModuleMarks::Homework* GetHomework();
@@ -327,7 +348,7 @@ namespace Bakalari {
 			bool* m_change;
 
 			vector<ModulePeople::Group*>* m_groups;
-			vector<ModulePeople::Cycle>* m_cycles;
+			vector<ModulePeople::Cycle*>* m_cycles;
 			ModulePeople::Teacher* m_teacher;
 			ModulePeople::Room* m_room;
 
@@ -337,24 +358,24 @@ namespace Bakalari {
 		class Day {
 		public:
 			Day();
-			Day(string _description, string _type, time_t _date, int _dayOfWeek, vector<Lesson> _lessons);
+			Day(string _description, string _type, tm _date, int _dayOfWeek, vector<Lesson> _lessons);
 			~Day();
 
 			void SetLessons(vector<Lesson> _lessons);
 			void SetDayOfWeek(int _dayOfWeek);
-			void SetDate(time_t _date);
+			void SetDate(tm _date);
 			void SetDescription(string _description);
 			void SetType(string _type);
 
-			vector<Lesson*> GetLessons();
-			int GetDayOfWeek();
-			time_t* GetDate();
+			vector<Lesson*>* GetLessons();
+			int* GetDayOfWeek();
+			tm* GetDate();
 			string* GetDescription();
 			string* GetType();
 		private:
-			vector<Lesson*> m_lessons;
-			int m_dayOfWeek;
-			time_t* m_date;
+			vector<Lesson*>* m_lessons;
+			int *m_dayOfWeek;
+			tm* m_date;
 			string* m_description, * m_type;
 			/*
 			Day types:
@@ -383,7 +404,7 @@ namespace Bakalari {
 			"Content-Type: application/x-www-form-urlencoded"
 			"Authorization: Bearer ACCESS_TOKEN"
 			*/
-			bool LoadByDate(ModuleAccess::Access* _access, time_t* daten);
+			bool LoadByDate(ModuleAccess::Access* _access, tm* daten);
 
 			/*
 			GET /api/3/timetable/permanent
