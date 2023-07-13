@@ -245,6 +245,33 @@ namespace Bakalari
 		return NULL;
 	}
 
+	template<typename T>
+	T* FindById(vector<T*> *array, string Id)
+	{
+		for (auto& elem : array)
+		{
+			if (*elem->GetId() == Id)
+			{
+				return elem;
+			}
+		}
+		return NULL;
+	}
+
+
+	template<typename T>
+	T* FindByIId(vector<T*>* array, int Id)
+	{
+		for (auto& elem : array)
+		{
+			if (*elem->GetId() == Id)
+			{
+				return elem;
+			}
+		}
+		return NULL;
+	}
+
 	namespace ModuleAccess
 	{
 
@@ -722,7 +749,7 @@ namespace Bakalari
 		{
 			json j;
 			long *code;
-			if (GetJson(&req_provider, &buff, string(*_access->GetSchool()->GetUrl() + "/api/3/user").c_str(), {}, &j, code) == 1)
+			if (GetJson(&req_provider, &buff, string(*_access->GetSchool()->GetUrl() + "/api/3/user").c_str(), {("Authorization: Bearer " + *_access->GetAccessToken())}, &j, code) == 1)
 			{
 				try
 				{
@@ -988,6 +1015,33 @@ namespace Bakalari
 			m_room = new ModulePeople::Room();
 		}
 
+		Lesson::Lesson(Hour _hour, Subject _subject, string _theme, bool _change, vector<ModulePeople::Group> _groups, vector<ModulePeople::Cycle> _cycles, ModulePeople::Teacher _teacher, ModulePeople::Room _room)
+		{
+			m_hour = new Hour();
+			m_subject = new Subject();
+			m_theme = new string();
+			m_change = new bool();
+
+			m_groups = new vector<ModulePeople::Group*>();
+			m_cycles = new vector<ModulePeople::Cycle*>();
+			m_teacher = new ModulePeople::Teacher();
+			m_room = new ModulePeople::Room();
+				*m_hour = _hour;
+				*m_subject = _subject;
+				*m_theme = _theme;
+				*m_change = _change;
+				for (auto& a : _groups)
+				{
+					m_groups->push_back(new ModulePeople::Group(a));
+				}
+				for (auto& a : _cycles)
+				{
+					m_cycles->push_back(new ModulePeople::Cycle(a));
+				}
+				*m_teacher = _teacher;
+				*m_room = _room;
+		}
+
 		Lesson::~Lesson()
 		{
 			m_hour = NULL;
@@ -1189,51 +1243,434 @@ namespace Bakalari
 		Note: when lesson changed or added it adds:
 		"ChangeType" and "Description", see: https://github.com/bakalari-api/bakalari-api-v3/blob/master/moduly/timetable.md
 		*/
-		class TimeTable
+		TimeTable::TimeTable()
 		{
-		public:
-			TimeTable();
-			~TimeTable();
+			m_days = new vector<Day*>();
+			m_classes = new vector<ModulePeople::Class*>();
+			m_groups = new vector<ModulePeople::Group*>();
+			m_rooms = new vector<ModulePeople::Room*>();
+			m_teachers = new vector<ModulePeople::Teacher*>();
+			m_subjects = new vector<Subject*>();
+			m_cycles = new vector<ModulePeople::Cycle*>();
+		}
 
+		TimeTable::~TimeTable()
+		{
+			m_days->clear();
+			m_classes->clear();
+			m_groups->clear();
+			m_rooms->clear();
+			m_teachers->clear();
+			m_subjects->clear();
+			m_cycles->clear();
+			delete m_days;
+			delete m_classes;
+			delete m_groups;
+			delete m_rooms;
+			delete m_teachers;
+			delete m_subjects;
+			delete m_cycles;
+		}
+
+
+		void LoadTm(tm* t, string src) {
+			istringstream ss(src.c_str());
+			ss >> get_time(t, "%H:%M");
+		}
+
+		void LoadTm(tm* t, const char* format, string src) {
+			istringstream ss(src.c_str());
+			ss >> get_time(t, format);
+		}
+
+
+		string GetYYYYMMdd(tm* t)
+		{
+			string tmp = to_string(t->tm_year) + "-" + to_string(t->tm_mon) +"-" + to_string(t->tm_mday);
+			return tmp;
+		}
 			/*
 			GET /api/3/timetable/actual?date=YYYY-MM-dd
 			"Content-Type: application/x-www-form-urlencoded"
 			"Authorization: Bearer ACCESS_TOKEN"
 			*/
-			bool LoadByDate(ModuleAccess::Access *_access, tm *daten);
+		bool TimeTable::LoadByDate(ModuleAccess::Access* _access, tm* daten)
+		{
+			/*
+			1. get json
+			2. get classes groups, etc... -> load
+			3. get days -> assign info by Ids from loaded data
+			*/
+
+			json j;
+			long* code;
+			if (GetJson(&req_provider, &buff, string(*_access->GetSchool()->GetUrl() + "/api/3/timetable/actual?date=" + GetYYYYMMdd(daten)).c_str(), { ("Authorization: Bearer " + *_access->GetAccessToken()) }, &j, code) == 1)
+			{
+				try
+				{
+					//...json getted
+
+					// - hours
+					for (auto e : j.at("Hours")) {
+						tm* t1 = new tm(), * t2= new tm();
+						try 
+						{
+							LoadTm(t1, e.at("BeginTime"));
+							LoadTm(t2, e.at("EndTime"));
+						}
+						catch (exception& e)
+						{
+							cout << "Exception when loading time: " << e.what() << endl;
+						}
+						m_hours->push_back(new Hour(e.at("Id").get<int>(), e.at("Caption").get<string>(), t1, t2));
+					}
+
+					// - cycles
+					for (auto e : j.at("Cycles")) 
+					{
+						m_cycles->push_back(new ModulePeople::Cycle(e.at("Id").get<string>(), e.at("Abbrev").get<string>(), e.at("Name").get<string>()));
+					}
+
+					// - rooms
+					for (auto e : j.at("Rooms")) 
+					{
+						m_rooms->push_back(new ModulePeople::Room(e.at("Id").get<string>(), e.at("Abbrev").get<string>(), e.at("Name").get<string>()));
+					}
+
+					// - teachers
+					for (auto e : j.at("Teacher")) 
+					{
+						m_teachers->push_back(new ModulePeople::Teacher(e.at("Id").get<string>(), e.at("Abbrev").get<string>(), e.at("Name").get<string>()));
+					}
+
+					// - subjects
+					for (auto e : j.at("Subjects")) 
+					{
+						m_subjects->push_back(new Subject(e.at("Id").get<string>(), e.at("Abbrev").get<string>(), e.at("Name").get<string>()));
+					}
+
+					// - classes
+					for (auto e : j.at("Classes")) 
+					{
+						m_classes->push_back(new ModulePeople::Class(e.at("Id").get<string>(), e.at("Abbrev").get<string>(), e.at("Name").get<string>()));
+					}
+
+					// - groups
+					for (auto e : j.at("Groups")) 
+					{
+						m_groups->push_back(new ModulePeople::Group(e.at("Id").get<string>(), e.at("Abbrev").get<string>(), e.at("Name").get<string>(), FindById(m_classes, e.at("ClassId").get<string>())));
+					}
+
+					// - days + lessons
+					for (auto e : j.at("Days")) 
+					{
+						vector<Lesson> _lessons;
+						for (auto f : e.at("Atoms"))
+						{
+							vector<ModulePeople::Group> _gr;
+							vector<ModulePeople::Cycle> _cy;
+							for (auto g : f.at("GroupIds")) {
+								_gr.push_back(ModulePeople::Group(*FindById(m_groups, g.get<string>())));
+							}
+
+							for (auto g : f.at("CycleIds")) {
+								_cy.push_back(ModulePeople::Cycle(*FindById(m_cycles, g.get<string>())));
+							}
+							
+							_lessons.push_back(Lesson(*FindByIId(m_hours, f.at("HourId").get<int>()), *FindById(m_subjects, f.at("SubjectId").get<string>()),
+								f.at("Theme").get<string>(), f.at("Change").get<bool>(), _gr , _cy,
+								*FindById(m_teachers, f.at("TeacherId").get<string>()), *FindById(m_rooms, f.at("RoomId").get<string>())));
+						}
+						/*
+						* DAY
+						"DayOfWeek": 1,
+            "Date": "2022-10-10T00:00:00+02:00",
+            "DayDescription": "",
+            "DayType": "WorkDay"
+						
+						*/
+						tm dayt;
+						try
+						{
+							LoadTm(&dayt, "%Y-%m-%d", e.at("Date").get<string>());
+						}
+						catch (exception& e)
+						{
+							cout << "Exception when loading time: " << e.what() << endl;
+						}
+						m_days->push_back(new Day(e.at("DayDescription").get<string>(), e.at("DayType").get<string>(),
+							dayt, e.at("DayOfWeek").get<int>(), _lessons
+							));
+					}
+
+				}
+				catch (exception& e)
+				{
+					cout << "E: " << e.what() << endl;
+					j.clear();
+					*code = 0;
+					delete code;
+					return false;
+				}
+			}
+			else
+			{
+				cout << "Failed to create request." << endl;
+				j.clear();
+				*code = 0;
+				delete code;
+				return false;
+			}
+			j.clear();
+			*code = 0;
+			delete code;
+			return true;
+
+			}
 
 			/*
 			GET /api/3/timetable/permanent
 			"Content-Type: application/x-www-form-urlencoded"
 			"Authorization: Bearer ACCESS_TOKEN"
 			*/
-			bool LoadPernament(ModuleAccess::Access *_access);
+			bool TimeTable::LoadPernament(ModuleAccess::Access *_access)
+			{
+				/*
+				1. get json
+				2. get classes groups, etc... -> load
+				3. get days -> assign info by Ids from loaded data
+				*/
 
-			void SetDays(vector<Day> _days);
-			void SetClasses(vector<ModulePeople::Class> _classes);
-			void SetGroups(vector<ModulePeople::Group> _groups);
-			void SetRooms(vector<ModulePeople::Room> _rooms);
-			void SetTeachers(vector<ModulePeople::Teacher> _teachers);
-			void SetCycles(vector<ModulePeople::Cycle> _cycles);
-			void SetSubjects(vector<Subject> _subjects);
+				json j;
+				long* code;
+				if (GetJson(&req_provider, &buff, string(*_access->GetSchool()->GetUrl() + "/api/3/timetable/permanent").c_str(), { ("Authorization: Bearer " + *_access->GetAccessToken()) }, &j, code) == 1)
+				{
+					try
+					{
+						//...json getted
 
-			vector<Day *> *GetDays();
-			vector<ModulePeople::Class *> *GetClasses();
-			vector<ModulePeople::Group *> *GetGroups();
-			vector<ModulePeople::Room *> *GetRooms();
-			vector<ModulePeople::Teacher *> *GetTeachers();
-			vector<Subject *> *GetSubjects();
-			vector<ModulePeople::Cycle *> *GetCycles();
+						// - hours
+						for (auto e : j.at("Hours")) {
+							tm* t1 = new tm(), * t2 = new tm();
+							try
+							{
+								LoadTm(t1, e.at("BeginTime"));
+								LoadTm(t2, e.at("EndTime"));
+							}
+							catch (exception& e)
+							{
+								cout << "Exception when loading time: " << e.what() << endl;
+							}
+							m_hours->push_back(new Hour(e.at("Id").get<int>(), e.at("Caption").get<string>(), t1, t2));
+						}
 
-		private:
-			vector<Day *> *m_days;
-			vector<ModulePeople::Class *> *m_classes;
-			vector<ModulePeople::Group *> *m_groups;
-			vector<ModulePeople::Room *> *m_rooms;
-			vector<ModulePeople::Teacher *> *m_teachers;
-			vector<Subject *> *m_subjects;
-			vector<ModulePeople::Cycle *> *m_cycles;
-		};
+						// - cycles
+						for (auto e : j.at("Cycles"))
+						{
+							m_cycles->push_back(new ModulePeople::Cycle(e.at("Id").get<string>(), e.at("Abbrev").get<string>(), e.at("Name").get<string>()));
+						}
+
+						// - rooms
+						for (auto e : j.at("Rooms"))
+						{
+							m_rooms->push_back(new ModulePeople::Room(e.at("Id").get<string>(), e.at("Abbrev").get<string>(), e.at("Name").get<string>()));
+						}
+
+						// - teachers
+						for (auto e : j.at("Teacher"))
+						{
+							m_teachers->push_back(new ModulePeople::Teacher(e.at("Id").get<string>(), e.at("Abbrev").get<string>(), e.at("Name").get<string>()));
+						}
+
+						// - subjects
+						for (auto e : j.at("Subjects"))
+						{
+							m_subjects->push_back(new Subject(e.at("Id").get<string>(), e.at("Abbrev").get<string>(), e.at("Name").get<string>()));
+						}
+
+						// - classes
+						for (auto e : j.at("Classes"))
+						{
+							m_classes->push_back(new ModulePeople::Class(e.at("Id").get<string>(), e.at("Abbrev").get<string>(), e.at("Name").get<string>()));
+						}
+
+						// - groups
+						for (auto e : j.at("Groups"))
+						{
+							m_groups->push_back(new ModulePeople::Group(e.at("Id").get<string>(), e.at("Abbrev").get<string>(), e.at("Name").get<string>(), FindById(m_classes, e.at("ClassId").get<string>())));
+						}
+
+						// - days + lessons
+						for (auto e : j.at("Days"))
+						{
+							vector<Lesson> _lessons;
+							for (auto f : e.at("Atoms"))
+							{
+								vector<ModulePeople::Group> _gr;
+								vector<ModulePeople::Cycle> _cy;
+								for (auto g : f.at("GroupIds")) {
+									_gr.push_back(ModulePeople::Group(*FindById(m_groups, g.get<string>())));
+								}
+
+								for (auto g : f.at("CycleIds")) {
+									_cy.push_back(ModulePeople::Cycle(*FindById(m_cycles, g.get<string>())));
+								}
+
+								_lessons.push_back(Lesson(*FindByIId(m_hours, f.at("HourId").get<int>()), *FindById(m_subjects, f.at("SubjectId").get<string>()),
+									f.at("Theme").get<string>(), f.at("Change").get<bool>(), _gr, _cy,
+									*FindById(m_teachers, f.at("TeacherId").get<string>()), *FindById(m_rooms, f.at("RoomId").get<string>())));
+							}
+							tm dayt;
+							try
+							{
+								LoadTm(&dayt, "%Y-%m-%d", e.at("Date").get<string>());
+							}
+							catch (exception& e)
+							{
+								cout << "Exception when loading time: " << e.what() << endl;
+							}
+							m_days->push_back(new Day(e.at("DayDescription").get<string>(), e.at("DayType").get<string>(),
+								dayt, e.at("DayOfWeek").get<int>(), _lessons
+							));
+						}
+
+					}
+					catch (exception& e)
+					{
+						cout << "E: " << e.what() << endl;
+						j.clear();
+						*code = 0;
+						delete code;
+						return false;
+					}
+				}
+				else
+				{
+					cout << "Failed to create request." << endl;
+					j.clear();
+					*code = 0;
+					delete code;
+					return false;
+				}
+				j.clear();
+				*code = 0;
+				delete code;
+				return true;
+
+			}
+
+			void TimeTable::SetDays(vector<Day> _days)
+			{
+				m_days->clear();
+				for (auto a : _days)
+				{
+					m_days->push_back(new Day(a));
+				}
+			}
+
+			void TimeTable::SetClasses(vector<ModulePeople::Class> _classes)
+			{
+				m_classes->clear();
+				for (auto a : _classes)
+				{
+					m_classes->push_back(new ModulePeople::Class(a));
+				}
+			}
+
+			void TimeTable::SetGroups(vector<ModulePeople::Group> _groups)
+			{
+				m_groups->clear();
+				for (auto a : _groups)
+				{
+					m_groups->push_back(new ModulePeople::Group(a));
+				}
+			}
+
+			void TimeTable::SetRooms(vector<ModulePeople::Room> _rooms)
+			{
+				m_rooms->clear();
+				for (auto a : _rooms)
+				{
+					m_rooms->push_back(new ModulePeople::Room(a));
+				}
+			}
+
+			void TimeTable::SetTeachers(vector<ModulePeople::Teacher> _teachers)
+			{
+				m_teachers->clear();
+				for (auto a : _teachers)
+				{
+					m_teachers->push_back(new ModulePeople::Teacher(a));
+				}
+			}
+
+			void TimeTable::SetCycles(vector<ModulePeople::Cycle> _cycles)
+			{
+				m_cycles->clear();
+				for (auto a : _cycles)
+				{
+					m_cycles->push_back(new ModulePeople::Cycle(a));
+				}
+			}
+
+			void TimeTable::SetSubjects(vector<Subject> _subjects)
+			{
+				m_subjects->clear();
+				for (auto a : _subjects)
+				{
+					m_subjects->push_back(new Subject(a));
+				}
+			}
+
+			void TimeTable::SetHours(vector<Hour> _hours)
+			{
+				m_hours->clear();
+				for (auto a : _hours)
+				{
+					m_hours->push_back(new Hour(a));
+				}
+			}
+
+			vector<Day *> * TimeTable::GetDays()
+			{
+				return m_days;
+			}
+
+			vector<ModulePeople::Class *> * TimeTable::GetClasses()
+			{
+				return m_classes;
+			}
+
+			vector<ModulePeople::Group *> * TimeTable::GetGroups()
+			{
+				return m_groups;
+			}
+
+			vector<ModulePeople::Room *> * TimeTable::GetRooms()
+			{
+				return m_rooms;
+			}
+
+			vector<ModulePeople::Teacher *> * TimeTable::GetTeachers()
+			{
+				return m_teachers;
+			}
+
+			vector<Subject *> * TimeTable::GetSubjects()
+			{
+				return m_subjects;
+			}
+
+			vector<ModulePeople::Cycle *> * TimeTable::GetCycles()
+			{
+				return m_cycles;
+			}
+
+			vector<Hour*>* TimeTable::GetHours()
+			{
+				return m_hours;
+			}
+
 
 	}
 }

@@ -42,6 +42,16 @@ namespace Bakalari {
 	*/
 	ABasicStruct* FindById(vector<ABasicStruct*> array, string Id);
 
+	template<typename T>
+	T* FindById(vector<T*>* array, string Id);
+
+
+	template<typename T>
+	T* FindByIId(vector<T*>* array, int Id);
+
+	template<typename T, typename T2>
+	T* FindByTId(vector<T*>* array, T2 Id);
+
 	/*
 	Access module 
 	- for getting access tokens
@@ -245,6 +255,7 @@ namespace Bakalari {
 		Groups class
 		*/
 		class Group : public ABasicStruct {
+		public:
 			Group();
 			Group(string _id, string _name, string _abbrev, Class _class);
 			Group(string _id, string _name, string _abbrev, Class* _class);
@@ -318,6 +329,7 @@ namespace Bakalari {
 		class Lesson {
 		public:
 			Lesson();
+			Lesson(Hour _hour, Subject _subject, string _theme, bool _change, vector<ModulePeople::Group> _groups, vector<ModulePeople::Cycle> _cycles, ModulePeople::Teacher _teacher, ModulePeople::Room _room);
 			~Lesson();
 
 
@@ -421,6 +433,7 @@ namespace Bakalari {
 			void SetTeachers(vector<ModulePeople::Teacher> _teachers);
 			void SetCycles(vector<ModulePeople::Cycle> _cycles);
 			void SetSubjects(vector<Subject> _subjects);
+			void SetHours(vector<Hour> _hours);
 
 			vector<Day*>* GetDays();
 			vector<ModulePeople::Class*>* GetClasses();
@@ -429,6 +442,7 @@ namespace Bakalari {
 			vector<ModulePeople::Teacher*>* GetTeachers();
 			vector<Subject*>* GetSubjects();
 			vector<ModulePeople::Cycle*>* GetCycles();
+			vector<Hour*>* GetHours();
 
 		private:
 			vector<Day*>* m_days;
@@ -438,6 +452,7 @@ namespace Bakalari {
 			vector<ModulePeople::Teacher*>* m_teachers;
 			vector<Subject*>* m_subjects;
 			vector<ModulePeople::Cycle*>* m_cycles;
+			vector<Hour*>* m_hours;
 		};
 
 	}
